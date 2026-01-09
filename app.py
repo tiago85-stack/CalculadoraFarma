@@ -8,16 +8,15 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- ESTILO (Botão largo e campos limpos) ---
+# --- ESTILIZAÇÃO (Botão e Métricas) ---
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; margin-top: 10px; font-weight: bold; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; }
+    .stButton>button { width: 100%; margin-top: 15px; font-weight: bold; font-size: 18px; }
+    div[data-testid="stMetricValue"] { font-size: 2rem; color: #0066cc; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- BANCO DE DADOS ATUALIZADO (Com Princípio Ativo) ---
-# A chave agora inclui o Nome Comercial + Princípio Ativo para aparecer no menu
+# --- BANCO DE DADOS (Com Princípio Ativo) ---
 medicamentos = {
     "Exodus / Lexapro (Escitalopram)":      {"gotas_ml": 20, "frasco_padrao": 15},
     "Daforin (Fluoxetina)":                 {"gotas_ml": 20, "frasco_padrao": 20},
@@ -38,89 +37,49 @@ st.markdown("---")
 # --- 1. SELEÇÃO DO MEDICAMENTO ---
 st.subheader("1. Medicamento")
 
-# Seleção única com nomes completos
 nome_escolhido = st.selectbox(
-    "Selecione o medicamento (Nome / Princípio Ativo):",
+    "Selecione o medicamento:",
     options=medicamentos.keys()
 )
 dados_med = medicamentos[nome_escolhido]
 
-# Mostra o padrão apenas como informação visual
-st.info(f"ℹ️ **Padrão de Bula:** {dados_med['gotas_ml']} gotas/mL | Frasco de {dados_med['frasco_padrao']} mL")
+# Mostra o gotejamento apenas para confirmação visual
+st.caption(f"ℹ️ Parâmetro de Bula: **{dados_med['gotas_ml']} gotas/mL**")
 
 st.markdown("---")
 
-# --- 2. CONFIGURAÇÃO DO FRASCO (Opção B) ---
-st.subheader("2. Qual frasco será entregue?")
+# --- 2. VOLUME DO FRASCO (EDITÁVEL) ---
+st.subheader("2. Volume do Frasco")
 
-# Layout de colunas para o rádio e o input ficarem organizados
-col_tipo, col_vol = st.columns([1.5, 1])
-
-with col_tipo:
-    # Opção B textual como você pediu
-    tipo_frasco = st.radio(
-        "Selecione a apresentação:",
-        ("Opção A: Padrão da Tabela", "Opção B: Genérico/Outro")
-    )
-
-with col_vol:
-    # Lógica de edição
-    if tipo_frasco == "Opção A: Padrão da Tabela":
-        # Se for padrão, fixa o valor mas mostra desabilitado (ou apenas informativo)
-        tamanho_frasco = st.number_input(
-            "Volume (mL):",
-            value=float(dados_med['frasco_padrao']),
-            disabled=True # Trava a edição para evitar erro na Opção A
-        )
-    else:
-        # Se for Opção B, libera a edição e foca no campo
-        tamanho_frasco = st.number_input(
-            "Volume do Genérico (mL):",
-            min_value=1.0,
-            value=float(dados_med['frasco_padrao']), # Começa com o padrão, mas editável
-            step=1.0,
-            help="Edite este valor conforme o frasco que você tem em mãos."
-        )
+# Aqui está a mudança: Apenas um campo simples.
+# Ele já vem com o valor padrão, mas você pode alterar se for Genérico.
+tamanho_frasco = st.number_input(
+    "Volume do frasco (mL):",
+    min_value=1.0,
+    value=float(dados_med['frasco_padrao']), # Traz o valor do banco
+    step=1.0,
+    format="%.1f",
+    help="O valor vem preenchido com o padrão, mas você pode alterar para Genéricos."
+)
 
 st.markdown("---")
 
-# --- 3. POSOLOGIA ---
-st.subheader("3. Receita Médica")
+# --- 3. RECEITA MÉDICA ---
+st.subheader("3. Posologia")
 
-c_gotas, c_dias = st.columns(2)
-with c_gotas:
+c1, c2 = st.columns(2)
+with c1:
     gotas_por_dia = st.number_input("Gotas por Dia:", min_value=1, value=10)
-with c_dias:
+with c2:
     dias_tratamento = st.number_input("Dias de Tratamento:", min_value=1, value=30)
 
+# Alerta de legislação
 if dias_tratamento > 60:
-    st.error(f"⚠️ **Atenção:** {dias_tratamento} dias ultrapassa o limite de 60 dias.")
+    st.error(f"⚠️ **Atenção:** {dias_tratamento} dias excede o limite de 60 dias.")
 
 # --- CÁLCULO ---
 if st.button("CALCULAR QUANTIDADE", type="primary"):
     
-    # Matemática
+    # Lógica
     total_gotas = gotas_por_dia * dias_tratamento
-    ml_necessarios = total_gotas / dados_med['gotas_ml']
-    
-    frascos_exatos = ml_necessarios / tamanho_frasco
-    frascos_final = math.ceil(frascos_exatos)
-    
-    ml_total_comprado = frascos_final * tamanho_frasco
-    sobra_ml = ml_total_comprado - ml_necessarios
-    
-    # --- RESULTADO ---
-    st.markdown("### ✅ Resultado da Análise")
-    
-    with st.container():
-        # Métricas lado a lado
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Frascos a Entregar", f"{frascos_final} un")
-        m2.metric("Volume do Tratamento", f"{ml_necessarios:.1f} mL")
-        m3.metric("Volume Vendido", f"{ml_total_comprado:.1f} mL")
-    
-    if sobra_ml > 0:
-        st.success(f"💡 **Informação:** Sobrará aprox. **{sobra_ml:.1f} mL** no último frasco.")
-
-else:
-    st.write("👆 Preencha e clique para calcular.")
+    ml_necessarios = total_gotas / dados_med['
