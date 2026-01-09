@@ -82,4 +82,26 @@ if st.button("CALCULAR QUANTIDADE", type="primary"):
     
     # Lógica
     total_gotas = gotas_por_dia * dias_tratamento
-    ml_necessarios = total_gotas / dados_med['
+    ml_necessarios = total_gotas / dados_med['gotas_ml']
+    
+    frascos_exatos = ml_necessarios / tamanho_frasco
+    frascos_final = math.ceil(frascos_exatos)
+    
+    ml_vendidos = frascos_final * tamanho_frasco
+    sobra = ml_vendidos - ml_necessarios
+    
+    # --- RESULTADO ---
+    st.divider()
+    st.markdown("### ✅ Resultado")
+    
+    col_res1, col_res2, col_res3 = st.columns(3)
+    
+    col_res1.metric("Frascos", f"{frascos_final} cx")
+    col_res2.metric("Volume Real", f"{ml_necessarios:.1f} mL")
+    col_res3.metric("Total Gotas", f"{total_gotas}")
+    
+    if sobra > 0:
+        st.info(f"💡 **Sobra:** Aproximadamente **{sobra:.1f} mL** no último frasco.")
+
+else:
+    st.write("👆 Clique para calcular.")
