@@ -2,83 +2,112 @@ import streamlit as st
 import math
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Calculadora Farma", page_icon="💊")
+st.set_page_config(
+    page_title="Calculadora Farmácia",
+    page_icon="💊",
+    layout="centered"
+)
 
-# --- BANCO DE DADOS (Baseado no seu PDF) ---
-# Dicionário com os dados dos medicamentos
+# --- BANCO DE DADOS (Padrões sugeridos) ---
+# Fonte: Tabela de conversão enviada
 medicamentos = {
-    1: {"nome": "Exodus / Lexapro",      "gotas_ml": 20, "frasco_ml": 15},
-    2: {"nome": "Daforin",               "gotas_ml": 20, "frasco_ml": 20},
-    3: {"nome": "Tramal",                "gotas_ml": 40, "frasco_ml": 10},
-    4: {"nome": "Lexotan",               "gotas_ml": 25, "frasco_ml": 20},
-    5: {"nome": "Rivotril",              "gotas_ml": 25, "frasco_ml": 20},
-    6: {"nome": "Haldol",                "gotas_ml": 20, "frasco_ml": 30},
-    7: {"nome": "Amplictil",             "gotas_ml": 40, "frasco_ml": 20},
-    8: {"nome": "Gardenal",              "gotas_ml": 40, "frasco_ml": 20},
-    9: {"nome": "Neozine",               "gotas_ml": 40, "frasco_ml": 20},
-    10: {"nome": "Neuleptil (1% ou 4%)", "gotas_ml": 40, "frasco_ml": 20},
+    "Exodus / Lexapro":      {"gotas_ml": 20, "frasco_padrao": 15},
+    "Daforin":               {"gotas_ml": 20, "frasco_padrao": 20},
+    "Tramal":                {"gotas_ml": 40, "frasco_padrao": 10},
+    "Lexotan":               {"gotas_ml": 25, "frasco_padrao": 20},
+    "Rivotril":              {"gotas_ml": 25, "frasco_padrao": 20},
+    "Haldol":                {"gotas_ml": 20, "frasco_padrao": 30},
+    "Amplictil":             {"gotas_ml": 40, "frasco_padrao": 20},
+    "Gardenal":              {"gotas_ml": 40, "frasco_padrao": 20},
+    "Neozine":               {"gotas_ml": 40, "frasco_padrao": 20},
+    "Neuleptil (1% ou 4%)":  {"gotas_ml": 40, "frasco_padrao": 20},
 }
 
-# --- INTERFACE VISUAL (FRONT-END) ---
+# --- TÍTULO ---
 st.title("💊 Calculadora de Dispensação")
-st.markdown("Use esta ferramenta para calcular a quantidade de frascos para **medicamentos controlados**.")
+st.markdown("---")
 
-# Criando uma lista apenas com os nomes para o usuário escolher
-opcoes_nomes = {med['nome']: id_med for id_med, med in medicamentos.items()}
-nome_selecionado = st.selectbox("Selecione o Medicamento:", list(opcoes_nomes.keys()))
+# --- BARRA LATERAL (ENTRADAS) ---
+st.sidebar.header("1. Configuração do Medicamento")
 
-# Recuperando os dados do medicamento escolhido
-id_selecionado = opcoes_nomes[nome_selecionado]
-med = medicamentos[id_selecionado]
+# Seleção do Nome
+nome_med = st.sidebar.selectbox(
+    "Medicamento:",
+    options=medicamentos.keys()
+)
 
-# Mostrando os dados técnicos na tela para conferência
-st.info(f"**Parâmetros do {nome_selecionado}:** {med['gotas_ml']} gotas/mL | Frasco de {med['frasco_ml']} mL")
+# Pega os dados padrão do dicionário
+dados_padrao = medicamentos[nome_med]
 
-st.divider() # Linha divisória
+# MOSTRAR E EDITAR O TAMANHO DO FRASCO
+# Aqui está a mudança: O valor vem do dicionário, mas o usuário pode alterar.
+st.sidebar.markdown("---")
+st.sidebar.subheader("Ajuste do Frasco")
+tamanho_frasco = st.sidebar.number_input(
+    "Volume do Frasco (mL):",
+    min_value=1.0,
+    value=float(dados_padrao['frasco_padrao']), # Carrega o padrão aqui
+    step=1.0,
+    help="Se o genérico tiver tamanho diferente, altere este valor."
+)
 
-# --- COLUNAS PARA ENTRADA DE DADOS ---
-col1, col2 = st.columns(2)
+st.sidebar.info(
+    f"**{nome_med}**\n\n"
+    f"Gotejamento fixo: {dados_padrao['gotas_ml']} gts/mL\n"
+    f"Frasco considerado: {tamanho_frasco} mL"
+)
 
+st.sidebar.markdown("---")
+st.sidebar.header("2. Posologia")
+
+col1, col2 = st.sidebar.columns(2)
 with col1:
-    gotas_por_dia = st.number_input("Gotas por DIA:", min_value=1, value=10, step=1)
-
+    gotas_por_dia = st.number_input("Gotas/Dia", min_value=1, value=10)
 with col2:
-    dias_tratamento = st.number_input("Duração (DIAS):", min_value=1, value=30, step=1)
+    dias_tratamento = st.number_input("Dias", min_value=1, value=30)
 
-# --- LÓGICA DE VALIDAÇÃO (REGRA DE NEGÓCIO) ---
-# Verifica a regra dos 60 dias automaticamente
+# --- VALIDAÇÃO 60 DIAS ---
 if dias_tratamento > 60:
-    st.error(f"⚠️ ATENÇÃO: {dias_tratamento} dias excede o limite legal de 60 dias para controlados!")
-    confirmacao = st.checkbox("Estou ciente e quero calcular mesmo assim (Regime Especial)")
-else:
-    confirmacao = True
+    st.warning(f"⚠️ **ATENÇÃO:** {dias_tratamento} dias excede o limite comum de 60 dias para controlados.")
 
-# --- BOTÃO DE CALCULAR ---
-if st.button("Calcular Quantidade", type="primary"):
-    if confirmacao:
-        # Cálculos Matemáticos
-        total_gotas = gotas_por_dia * dias_tratamento
-        total_ml_necessario = total_gotas / med['gotas_ml']
-        frascos_exatos = total_ml_necessario / med['frasco_ml']
-        frascos_final = math.ceil(frascos_exatos)
-        
-        # Cálculo de Sobra
-        total_ml_frascos = frascos_final * med['frasco_ml']
-        sobra_ml = total_ml_frascos - total_ml_necessario
-        dias_extras = int((sobra_ml * med['gotas_ml']) / gotas_por_dia)
+# --- BOTÃO E CÁLCULOS ---
+if st.sidebar.button("Calcular Quantidade", type="primary"):
+    
+    # 1. Quantas gotas o paciente vai tomar no total?
+    total_gotas = gotas_por_dia * dias_tratamento
+    
+    # 2. Quantos mL isso representa? (Baseado na densidade do remédio)
+    total_ml_necessario = total_gotas / dados_padrao['gotas_ml']
+    
+    # 3. Quantos frascos precisa? (Usando o tamanho_frasco que você editou)
+    frascos_exatos = total_ml_necessario / tamanho_frasco
+    frascos_finais = math.ceil(frascos_exatos)
+    
+    # 4. Cálculo de Sobra
+    volume_comprado = frascos_finais * tamanho_frasco
+    sobra_ml = volume_comprado - total_ml_necessario
+    
+    # Estimar quantos dias a sobra rende
+    dias_extras = 0
+    if gotas_por_dia > 0:
+        dias_extras = int((sobra_ml * dados_padrao['gotas_ml']) / gotas_por_dia)
 
-        # --- EXIBIÇÃO DOS RESULTADOS ---
-        st.success("Cálculo realizado com sucesso!")
-        
-        # Usando Métricas (Visual bonito com números grandes)
-        col_res1, col_res2, col_res3 = st.columns(3)
-        col_res1.metric("Frascos a Comprar", f"{frascos_final} un", delta="Caixas Fechadas")
-        col_res2.metric("Volume Total", f"{total_ml_necessario:.1f} mL")
-        col_res3.metric("Sobra Estimada", f"{sobra_ml:.1f} mL")
-        
-        # Detalhe extra
-        if dias_extras > 0:
-            st.caption(f"💡 Dica: A sobra no frasco é suficiente para mais **{dias_extras} dias** de tratamento.")
+    # --- RESULTADO NA TELA ---
+    st.subheader("Resultado")
+    
+    # Containers visuais
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Frascos a Comprar", f"{frascos_finais} cx")
+    c2.metric("Volume Real Necessário", f"{total_ml_necessario:.1f} mL")
+    c3.metric("Total de Gotas", f"{total_gotas}")
+
+    st.success(f"O paciente levará **{volume_comprado} mL** no total.")
+
+    # Análise de Sobra
+    if sobra_ml > 0:
+        with st.expander("ℹ️ Detalhes da Sobra (Clique para ver)"):
+            st.write(f"Vai sobrar aproximadamente **{sobra_ml:.1f} mL** no último frasco.")
+            st.write(f"Essa sobra daria para cobrir mais **{dias_extras} dias** de tratamento.")
             
-    else:
-        st.warning("O cálculo foi bloqueado devido à regra de 60 dias.")
+else:
+    st.info("👈 Ajuste os dados na barra lateral e clique em Calcular.")
