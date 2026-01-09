@@ -3,13 +3,22 @@ import math
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Calculadora Farmácia",
+    page_title="Calculadora Farmácia Central",
     page_icon="💊",
-    layout="centered"
+    layout="centered" # Isso já garante que o conteúdo fique no meio
 )
 
-# --- BANCO DE DADOS (Padrões sugeridos) ---
-# Fonte: Tabela de conversão enviada
+# --- ESTILIZAÇÃO CSS (Opcional, para deixar os inputs mais bonitos) ---
+st.markdown("""
+    <style>
+    .stButton>button {
+        width: 100%;
+        margin-top: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- BANCO DE DADOS ---
 medicamentos = {
     "Exodus / Lexapro":      {"gotas_ml": 20, "frasco_padrao": 15},
     "Daforin":               {"gotas_ml": 20, "frasco_padrao": 20},
@@ -23,91 +32,94 @@ medicamentos = {
     "Neuleptil (1% ou 4%)":  {"gotas_ml": 40, "frasco_padrao": 20},
 }
 
-# --- TÍTULO ---
+# --- CABEÇALHO ---
 st.title("💊 Calculadora de Dispensação")
+st.caption("Ferramenta para cálculo de frascos de medicamentos controlados.")
 st.markdown("---")
 
-# --- BARRA LATERAL (ENTRADAS) ---
-st.sidebar.header("1. Configuração do Medicamento")
+# --- BLOCO 1: SELEÇÃO DO MEDICAMENTO ---
+st.subheader("1. Escolha o Medicamento")
 
-# Seleção do Nome
-nome_med = st.sidebar.selectbox(
-    "Medicamento:",
-    options=medicamentos.keys()
-)
+# Cria duas colunas para dividir a seleção da informação técnica
+c1, c2 = st.columns([2, 1]) 
 
-# Pega os dados padrão do dicionário
-dados_padrao = medicamentos[nome_med]
+with c1:
+    nome_med = st.selectbox("Selecione na lista:", options=medicamentos.keys())
+    dados_med = medicamentos[nome_med]
 
-# MOSTRAR E EDITAR O TAMANHO DO FRASCO
-# Aqui está a mudança: O valor vem do dicionário, mas o usuário pode alterar.
-st.sidebar.markdown("---")
-st.sidebar.subheader("Ajuste do Frasco")
-tamanho_frasco = st.sidebar.number_input(
-    "Volume do Frasco (mL):",
-    min_value=1.0,
-    value=float(dados_padrao['frasco_padrao']), # Carrega o padrão aqui
-    step=1.0,
-    help="Se o genérico tiver tamanho diferente, altere este valor."
-)
+with c2:
+    # Mostra os dados técnicos num card estático ao lado da seleção
+    st.info(f"**Padrão Tabela:**\n\n💧 {dados_med['gotas_ml']} gts/mL\n\n📦 {dados_med['frasco_padrao']} mL")
 
-st.sidebar.info(
-    f"**{nome_med}**\n\n"
-    f"Gotejamento fixo: {dados_padrao['gotas_ml']} gts/mL\n"
-    f"Frasco considerado: {tamanho_frasco} mL"
-)
+st.markdown("---")
 
-st.sidebar.markdown("---")
-st.sidebar.header("2. Posologia")
+# --- BLOCO 2: CONFIGURAÇÃO DO FRASCO (Opção A/B) ---
+st.subheader("2. Configuração do Frasco")
 
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    gotas_por_dia = st.number_input("Gotas/Dia", min_value=1, value=10)
-with col2:
-    dias_tratamento = st.number_input("Dias", min_value=1, value=30)
+# Aqui usamos um container para agrupar essa lógica visualmente
+with st.container():
+    col_radio, col_input = st.columns(2)
+    
+    with col_radio:
+        tipo_frasco = st.radio(
+            "Qual apresentação será vendida?",
+            ("Opção A: Padrão da Tabela", "Opção B: Genérico/Outro")
+        )
 
-# --- VALIDAÇÃO 60 DIAS ---
+    with col_input:
+        if tipo_frasco == "Opção A: Padrão da Tabela":
+            tamanho_frasco = float(dados_med['frasco_padrao'])
+            st.success(f"🔒 Volume fixado em **{tamanho_frasco} mL**")
+        else:
+            tamanho_frasco = st.number_input(
+                "Digite o volume do Genérico (mL):",
+                min_value=1.0,
+                value=float(dados_med['frasco_padrao']),
+                step=1.0
+            )
+
+st.markdown("---")
+
+# --- BLOCO 3: POSOLOGIA ---
+st.subheader("3. Posologia da Receita")
+
+col_dias, col_gotas = st.columns(2)
+
+with col_gotas:
+    gotas_por_dia = st.number_input("Quantas Gotas por Dia?", min_value=1, value=10)
+
+with col_dias:
+    dias_tratamento = st.number_input("Duração do Tratamento (Dias)", min_value=1, value=30)
+
+# Validação visual imediata
 if dias_tratamento > 60:
-    st.warning(f"⚠️ **ATENÇÃO:** {dias_tratamento} dias excede o limite comum de 60 dias para controlados.")
+    st.error(f"⚠️ Atenção: {dias_tratamento} dias ultrapassa o limite sugerido de 60 dias.")
 
-# --- BOTÃO E CÁLCULOS ---
-if st.sidebar.button("Calcular Quantidade", type="primary"):
+# --- BOTÃO DE AÇÃO (Largo) ---
+if st.button("CALCULAR QUANTIDADE", type="primary"):
     
-    # 1. Quantas gotas o paciente vai tomar no total?
+    # --- CÁLCULOS ---
     total_gotas = gotas_por_dia * dias_tratamento
+    ml_necessarios = total_gotas / dados_med['gotas_ml']
     
-    # 2. Quantos mL isso representa? (Baseado na densidade do remédio)
-    total_ml_necessario = total_gotas / dados_padrao['gotas_ml']
+    frascos_exatos = ml_necessarios / tamanho_frasco
+    frascos_final = math.ceil(frascos_exatos)
     
-    # 3. Quantos frascos precisa? (Usando o tamanho_frasco que você editou)
-    frascos_exatos = total_ml_necessario / tamanho_frasco
-    frascos_finais = math.ceil(frascos_exatos)
+    ml_total_comprado = frascos_final * tamanho_frasco
+    sobra_ml = ml_total_comprado - ml_necessarios
     
-    # 4. Cálculo de Sobra
-    volume_comprado = frascos_finais * tamanho_frasco
-    sobra_ml = volume_comprado - total_ml_necessario
+    # --- RESULTADO CENTRALIZADO ---
+    st.markdown("### ✅ Resultado")
     
-    # Estimar quantos dias a sobra rende
-    dias_extras = 0
-    if gotas_por_dia > 0:
-        dias_extras = int((sobra_ml * dados_padrao['gotas_ml']) / gotas_por_dia)
-
-    # --- RESULTADO NA TELA ---
-    st.subheader("Resultado")
+    # Usando container para destacar o resultado
+    with st.container():
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Frascos a Comprar", f"{frascos_final} cx", delta="Recomendado")
+        r2.metric("Volume Necessário", f"{ml_necessarios:.1f} mL")
+        r3.metric("Volume Vendido", f"{ml_total_comprado:.1f} mL")
     
-    # Containers visuais
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Frascos a Comprar", f"{frascos_finais} cx")
-    c2.metric("Volume Real Necessário", f"{total_ml_necessario:.1f} mL")
-    c3.metric("Total de Gotas", f"{total_gotas}")
-
-    st.success(f"O paciente levará **{volume_comprado} mL** no total.")
-
-    # Análise de Sobra
     if sobra_ml > 0:
-        with st.expander("ℹ️ Detalhes da Sobra (Clique para ver)"):
-            st.write(f"Vai sobrar aproximadamente **{sobra_ml:.1f} mL** no último frasco.")
-            st.write(f"Essa sobra daria para cobrir mais **{dias_extras} dias** de tratamento.")
-            
+        st.info(f"💡 **Nota ao Paciente:** Sobrará aprox. **{sobra_ml:.1f} mL** no último frasco.")
+
 else:
-    st.info("👈 Ajuste os dados na barra lateral e clique em Calcular.")
+    st.write("👆 Preencha os dados acima e clique em calcular.")
