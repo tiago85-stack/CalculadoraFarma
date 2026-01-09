@@ -1,62 +1,97 @@
 import streamlit as st
+import math
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA (Isso define o nome na aba e o ícone) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="CalcFarma",  # O nome que aparece na aba do navegador
-    page_icon="💊",          # O ícone (Favicon). Pode ser um emoji ou arquivo .png
-    layout="centered",       # Centraliza o conteúdo no celular
-    initial_sidebar_state="collapsed" # Esconde o menu lateral para parecer mais app
+    page_title="Calculadora de Dispensação",
+    page_icon="💊",
+    layout="centered"
 )
 
-# --- 2. CABEÇALHO ---
-st.title("Calculadora Pediátrica 💊")
-st.markdown("**Medicamento:** Dipirona (500mg/mL)\n\n**Regra:** 1 gota por kg")
+# --- BANCO DE DADOS (Baseado no seu PDF) ---
+# Dica de Eng. Software: Usar o Nome como 'Chave' facilita a busca no Selectbox
+medicamentos = {
+    "Exodus / Lexapro":      {"gotas_ml": 20, "frasco_ml": 15},
+    "Daforin":               {"gotas_ml": 20, "frasco_ml": 20},
+    "Tramal":                {"gotas_ml": 40, "frasco_ml": 10},
+    "Lexotan":               {"gotas_ml": 25, "frasco_ml": 20},
+    "Rivotril":              {"gotas_ml": 25, "frasco_ml": 20},
+    "Haldol":                {"gotas_ml": 20, "frasco_ml": 30},
+    "Amplictil":             {"gotas_ml": 40, "frasco_ml": 20},
+    "Gardenal":              {"gotas_ml": 40, "frasco_ml": 20},
+    "Neozine":               {"gotas_ml": 40, "frasco_ml": 20},
+    "Neuleptil (1% ou 4%)":  {"gotas_ml": 40, "frasco_ml": 20},
+}
 
-# --- 3. ENTRADA DE DADOS ---
-# step=0.1 permite digitar pesos quebrados (ex: 12.5 kg)
-peso = st.number_input("Digite o peso da criança (kg):", min_value=0.0, step=0.1, format="%.1f")
+# --- TÍTULO E CABEÇALHO ---
+st.title("💊 Calculadora de Dispensação")
+st.markdown("Calcula a quantidade de frascos baseada na **tabela de controlados**.")
+st.markdown("---")
 
-# --- 4. CONTROLE DE ESTADO (MEMÓRIA) ---
-# O Streamlit apaga variáveis a cada clique, então usamos session_state para lembrar do resultado
-if 'resultado' not in st.session_state:
-    st.session_state.resultado = None
-if 'tipo_msg' not in st.session_state:
-    st.session_state.tipo_msg = "info" # pode ser 'success', 'warning' ou 'error'
+# --- BARRA LATERAL (SIDEBAR) PARA ENTRADAS ---
+st.sidebar.header("Prescrição Médica")
 
-# --- 5. LÓGICA E BOTÕES ---
-col1, col2 = st.columns(2) # Cria duas colunas para os botões ficarem lado a lado
+# 1. Seleção do Medicamento
+nome_med = st.sidebar.selectbox(
+    "Selecione o Medicamento:",
+    options=medicamentos.keys()
+)
+
+# Recupera os dados do medicamento selecionado
+dados_med = medicamentos[nome_med]
+
+# Mostra detalhes do medicamento escolhido na tela principal
+st.info(f"**Medicamento Selecionado:** {nome_med} \n\n "
+        f"💧 Gotejamento: {dados_med['gotas_ml']} gts/mL | 📦 Frasco: {dados_med['frasco_ml']} mL")
+
+# 2. Entradas de valores (usando colunas para ficar lado a lado)
+col1, col2 = st.sidebar.columns(2)
 
 with col1:
-    # Botão Calcular (Primary deixa ele destacado/vermelho no tema padrão)
-    if st.button("Calcular", type="primary", use_container_width=True):
-        if peso > 0:
-            gotas = int(peso) # Regra: 1 gota por kg
-            
-            # Regra de Segurança (Teto)
-            if gotas > 40:
-                gotas = 40
-                st.session_state.resultado = f"Dose Teto: {gotas} gotas (Máximo atingido)"
-                st.session_state.tipo_msg = "warning"
-            else:
-                st.session_state.resultado = f"Dose Recomendada: {gotas} gotas"
-                st.session_state.tipo_msg = "success"
-        else:
-            st.session_state.resultado = "Por favor, digite um peso válido."
-            st.session_state.tipo_msg = "error"
+    gotas_por_dia = st.number_input("Gotas/Dia", min_value=1, value=10, step=1)
 
 with col2:
-    # Botão Limpar
-    if st.button("Limpar", use_container_width=True):
-        st.session_state.resultado = None # Limpa a memória
-        st.rerun() # Recarrega a página para limpar o campo numérico (reset visual)
+    dias_tratamento = st.number_input("Duração (Dias)", min_value=1, value=30, step=1)
 
-# --- 6. EXIBIÇÃO DO RESULTADO ---
-st.divider() # Uma linha divisória bonita
+# --- VALIDAÇÃO DA REGRA DE 60 DIAS ---
+if dias_tratamento > 60:
+    st.warning(f"⚠️ **ATENÇÃO:** O tratamento de {dias_tratamento} dias excede o limite sugerido de 60 dias para controlados.")
 
-if st.session_state.resultado:
-    if st.session_state.tipo_msg == "success":
-        st.success(st.session_state.resultado, icon="✅")
-    elif st.session_state.tipo_msg == "warning":
-        st.warning(st.session_state.resultado, icon="⚠️")
-    else:
-        st.error(st.session_state.resultado, icon="❌")
+# --- LÓGICA DE CÁLCULO ---
+# Botão para calcular (opcional no Streamlit, mas bom para UX)
+if st.sidebar.button("Calcular Quantidade"):
+    
+    # Cálculos Matemáticos
+    total_gotas = gotas_por_dia * dias_tratamento
+    total_ml_necessario = total_gotas / dados_med['gotas_ml']
+    frascos_exatos = total_ml_necessario / dados_med['frasco_ml']
+    frascos_finais = math.ceil(frascos_exatos)
+    
+    # Cálculo de Sobra
+    ml_totais_comprados = frascos_finais * dados_med['frasco_ml']
+    sobra_ml = ml_totais_comprados - total_ml_necessario
+    dias_extras = int((sobra_ml * dados_med['gotas_ml']) / gotas_por_dia)
+
+    # --- EXIBIÇÃO DOS RESULTADOS ---
+    st.divider()
+    st.subheader("Resultado da Análise")
+
+    # Usando métricas visuais (Big Numbers)
+    col_res1, col_res2, col_res3 = st.columns(3)
+    
+    with col_res1:
+        st.metric(label="Frascos a Comprar", value=f"{frascos_finais} un.")
+    
+    with col_res2:
+        st.metric(label="Volume Necessário", value=f"{total_ml_necessario:.1f} mL")
+        
+    with col_res3:
+        st.metric(label="Total de Gotas", value=f"{total_gotas}")
+
+    # Exibição da sobra em formato de mensagem
+    if sobra_ml > 0:
+        st.success(f"💡 **Gestão de Sobra:** Vai sobrar aprox. **{sobra_ml:.1f} mL** no último frasco. \n\n"
+                   f"Isso cobre cerca de **+{dias_extras} dias** além do previsto.")
+
+else:
+    st.write("👈 Configure a receita na barra lateral e clique em **Calcular**.")
